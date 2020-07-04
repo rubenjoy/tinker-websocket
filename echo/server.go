@@ -166,6 +166,8 @@ func flood(w http.ResponseWriter, r *http.Request) {
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	timer := time.NewTimer(10 * time.Second)
+	defer timer.Stop()
 
 	for {
 		select {
@@ -175,7 +177,7 @@ func flood(w http.ResponseWriter, r *http.Request) {
 				log.Println("write message: ", err)
 				return
 			}
-		case <-time.After(10 * time.Second):
+		case <-timer.C:
 			_ = dumpMessage("10 seconds timed out")
 			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "after 10 seconds"), time.Now().Add(time.Second))
 			return
