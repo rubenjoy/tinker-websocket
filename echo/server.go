@@ -81,7 +81,7 @@ func responseWithPong(conn *websocket.Conn) pingHandler {
 
 func dropControlMessage(r *http.Request) bool {
 	query := r.URL.Query()
-	_, present := query["dropcontrol"]
+	_, present := query["drop"]
 	return present
 }
 
@@ -101,7 +101,20 @@ func ping(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = conn.WriteMessage(websocket.PingMessage, []byte("pmci"))
-	_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"))
+
+	go func() {
+		<-time.After(3 * time.Second)
+		_ = conn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseGoingAway, "after 3 seconds"))
+	}()
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		_ = dumpMessage("wait ping: ", string(message))
+	}
 }
 
 // echoMessage upgrades the HTTP request into a websocket
@@ -153,7 +166,21 @@ func flood(w http.ResponseWriter, r *http.Request) {
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	// TODO flooding the client with time message in every second for X seconds
+
+	for {
+		select {
+		case t := <-ticker.C:
+			err := conn.WriteMessage(websocket.TextMessage, []byte(t.String()))
+			if err != nil {
+				log.Println("write message: ", err)
+				return
+			}
+		case <-time.After(10 * time.Second):
+			_ = dumpMessage("10 seconds timed out")
+			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, "after 10 seconds"), time.Now().Add(time.Second))
+			return
+		}
+	}
 }
 
 func main() {
