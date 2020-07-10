@@ -1,4 +1,4 @@
-package main
+package faketime
 
 import (
 	"github.com/gorilla/websocket"
@@ -21,9 +21,13 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	if err := conn.WriteMessage(websocket.TextMessage, []byte("hello")); err != nil {
+	if err := writeText(conn, "hello", deadline); err != nil {
 		log.Println(err)
 	}
+	if err := writeText(conn, "1234", deadline); err != nil {
+		log.Println(err)
+	}
+
 	if err := conn.WriteControl(websocket.CloseMessage,
 		websocket.FormatCloseMessage(websocket.CloseNormalClosure, "bye"),
 		time.Now().Add(deadline)); err != nil {
@@ -31,6 +35,10 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-
+func writeText(conn *websocket.Conn, message string, d time.Duration) error {
+	err := conn.SetWriteDeadline(time.Now().Add(d))
+	if err != nil {
+		return err
+	}
+	return conn.WriteMessage(websocket.TextMessage, []byte(message))
 }
